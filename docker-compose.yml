@@ -1,0 +1,20 @@
+services:
+  lan-share:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST_IP=${HOST_IP}
+    volumes:
+      # Optional: persist files across restarts
+      - ./data:/tmp/lan-share-files
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/network"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
