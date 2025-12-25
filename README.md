@@ -1,6 +1,7 @@
 # LAN Share
 
-File sharing and real-time chat application for local WiFi networks.
+File sharing and real-time chat application for local WiFi networks. 
+> Because I'm iPhone poor.
 
 <table align="center" width="100%">
   <tr>
@@ -63,7 +64,10 @@ To find your IP:
 - `PORT`: Listening port (default: `3000`)
 - `AUTH_TOKEN`: Automatically generated token (UUID4) - no need to set it
 
-## Usage
+<br/>
+<br/>
+
+# Usage
 
 1. **Start**: `./start.sh`
 2. **On your Computer**: Open `http://localhost:3000`
@@ -71,6 +75,8 @@ To find your IP:
 4. **Chat & Files**: Exchange text or files
 
 ## Architecture
+
+<img src="readme/schema.png">
 
 - **Backend**: Hono with WebSocket
 - **Frontend**: React + Vite
