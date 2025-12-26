@@ -7,7 +7,7 @@ import { randomUUID } from 'crypto'
 import { networkInterfaces } from 'os'
 
 const app = new Hono()
-const PORT = parseInt(process.env.PORT || '3000')
+const PORT = parseInt(process.env.PORT || '3009')
 const AUTH_TOKEN = randomUUID() // Token UUID4 généré au démarrage
 
 // Stockage des fichiers en mémoire
@@ -185,11 +185,14 @@ app.get('/api/files', (c) => {
 })
 
 // Servir les fichiers statiques du frontend
-app.use('*', serveStatic({ root: './dist' }))
+// Pour l'exécutable standalone, utiliser le répertoire de l'exécutable
+import { dirname } from 'path';
+const executableDir = dirname(process.execPath);
+const staticRoot = join(executableDir, 'static');
+app.use('*', serveStatic({ root: staticRoot }))
 
 // Démarrage du serveur
 console.log(`Starting LAN Share server on port ${PORT}`)
-console.log(`Auth Token: ${AUTH_TOKEN.substring(0, 8)}...`)
 
 const server = Bun.serve<WSData>({
   port: PORT,

@@ -23,54 +23,23 @@ File sharing and real-time chat application for local WiFi networks.
 - 💬 Real-time chat between connected devices
 - 📁 File transfer
 
-## Quick Start
+## Prerequisites
 
-### Automatic Installation (recommended)
+### Option 1: Standalone
+- **Bun** runtime: [Install Bun](https://bun.sh/)
+  ```bash
+  curl -fsSL https://bun.sh/install | bash
+  ```
 
-The `start.sh` script automatically detects your network IP according to your OS:
+### Option 2: Docker
+- **Docker** and **Docker Compose**: [Install Docker](https://docs.docker.com/get-docker/)
 
-```bash
-cd file-share
-./start.sh
-```
-
-#### Script Options
-
-```bash
-# Use a specific IP (if automatic detection fails)
-HOST_IP=192.168.1.100 ./start.sh
-
-# Change port (default: 3000)
-PORT=8080 ./start.sh
-```
-
-### Manual Installation
-
-If automatic detection doesn't work:
-
-```bash
-cd file-share
-HOST_IP=your_ip_here docker-compose up --build
-```
-
-To find your IP:
-- **macOS**: `ipconfig getifaddr en0`
-- **Linux**: `hostname -I`
-- **Windows**: `ipconfig` (look for "IPv4 Address")
-
-### Environment Variables
-
-- `HOST_IP`: Your machine's IP for the QR code (auto-detected by script)
-- `PORT`: Listening port (default: `3000`)
-- `AUTH_TOKEN`: Automatically generated token (UUID4) - no need to set it
-
-<br/>
 <br/>
 
 # Usage
 
-1. **Start**: `./start.sh`
-2. **On your Computer**: Open `http://localhost:3000`
+1. **Start**: `./start.sh or ./start-docker.sh`
+2. **On your Computer**: Open `http://localhost:3009`
 3. **On your mobile**: Scan the QR code displayed on the Computer
 4. **Chat & Files**: Exchange text or files
 

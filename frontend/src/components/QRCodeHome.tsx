@@ -43,7 +43,7 @@ export const QRCodeHome = () => {
     const generateQR = async () => {
       if (token && hostIp) {
         try {
-          const url = `http://${hostIp}:3000?token=${token}`
+          const url = `http://${hostIp}:3009?token=${token}`
           const qrCodeDataUrl = await QRCode.toDataURL(url, {
             width: 300,
             margin: 2,

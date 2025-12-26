@@ -1,6 +1,7 @@
 # Dependencies
 node_modules/
 bun.lockb
+*/bun.lock
 
 # Environment variables
 .env
@@ -36,3 +37,5 @@ frontend/build/
 
 # Docker volumes
 data/
+
+dist/

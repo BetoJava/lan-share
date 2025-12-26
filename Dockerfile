@@ -39,11 +39,11 @@ RUN mkdir -p /tmp && chown -R lan-share:nodejs /tmp
 USER lan-share
 
 # Expose port
-EXPOSE 3000
+EXPOSE 3009
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:3000/api/network || exit 1
+  CMD curl -f http://localhost:3009/api/network || exit 1
 
 # Start the application
 CMD ["bun", "run", "src/index.ts"]

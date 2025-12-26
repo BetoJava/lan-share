@@ -4,13 +4,13 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3009:3009"
     environment:
-      - PORT=3000
+      - PORT=3009
       - HOST_IP=${HOST_IP}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/api/network"]
+      test: ["CMD", "curl", "-f", "http://localhost:3009/api/network"]
       interval: 30s
       timeout: 10s
       retries: 3

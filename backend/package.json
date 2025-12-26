@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "bun --hot src/index.ts",
     "build": "bun build src/index.ts --outdir dist",
+    "build:standalone": "bun build --compile src/index.ts --outfile ../dist/lan-share",
     "start": "bun dist/index.js"
   },
   "dependencies": {
