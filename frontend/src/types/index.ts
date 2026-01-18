@@ -12,5 +12,5 @@ export interface FileInfo {
   uploadedAt: Date
 }
 
-export type TabType = 'chat' | 'files' | 'network'
+export type TabType = 'chat' | 'files' | 'connect'
 
