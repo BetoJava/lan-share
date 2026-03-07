@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { UploadCloud, File, Download, HardDrive, Trash2 } from 'lucide-react'
 import { FileInfo } from '../types'
 import { Button } from './ui/Button'
+import { Checkbox } from './ui/checkbox'
 
 interface FileTransferProps {
   onFileUploaded?: () => void
@@ -10,6 +11,7 @@ interface FileTransferProps {
 
 export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) => {
   const [files, setFiles] = useState<FileInfo[]>([])
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isUploading, setIsUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
@@ -118,6 +120,37 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
     } catch (error) {
       console.error('Failed to load files:', error)
     }
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === files.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(files.map(f => f.id)))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const downloadSelected = async () => {
+    for (const id of selectedIds) {
+      const file = files.find(f => f.id === id)
+      if (file) await downloadFile(id, file.filename)
+    }
+  }
+
+  const deleteSelected = async () => {
+    if (!authToken) return
+    for (const id of selectedIds) {
+      await deleteFile(id)
+    }
+    setSelectedIds(new Set())
   }
 
   const deleteFile = async (fileId: string) => {
@@ -250,10 +283,35 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
       </div>
 
       <div className="pt-6 border-t border-gray-100">
-        <h3 className="text-md font-bold text-gray-900 mb-4 flex items-center">
-          <HardDrive className="mr-2 text-gray-500" size={18} />
-          Available Files
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-md font-bold text-gray-900 flex items-center">
+            <HardDrive className="mr-2 text-gray-500" size={18} />
+            Available Files
+          </h3>
+          {selectedIds.size > 0 && (
+            <div className="flex items-center space-x-2">
+              <span className="text-xs text-gray-500">{selectedIds.size} selected</span>
+              <Button
+                onClick={downloadSelected}
+                variant="secondary"
+                className="text-xs px-3 py-1 flex items-center space-x-1 hover:bg-blue-50 hover:text-blue-600"
+              >
+                <Download size={14} />
+                <span>Download</span>
+              </Button>
+              {authToken && (
+                <Button
+                  onClick={deleteSelected}
+                  variant="secondary"
+                  className="text-xs px-3 py-1 flex items-center space-x-1 hover:bg-red-50 hover:text-red-600"
+                >
+                  <Trash2 size={14} />
+                  <span>Delete</span>
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
 
         {files.length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed">
@@ -261,46 +319,59 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
             <p className="text-gray-500 text-sm">No files shared yet</p>
           </div>
         ) : (
-          <div className="flex flex-col-reverse gap-3">
-            {files.map((file) => (
-              <div
-                key={file.id}
-                className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group"
-              >
-                <div className="flex items-center space-x-3 min-w-0">
-                  <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                    <File size={20} />
+          <>
+            <div className="flex items-center px-4 pb-2 border-b border-gray-100 mb-2">
+              <Checkbox
+                checked={selectedIds.size === files.length}
+                onCheckedChange={toggleSelectAll}
+              />
+              <span className="ml-3 text-xs text-gray-500">Select all</span>
+            </div>
+            <div className="flex flex-col-reverse gap-3">
+              {files.map((file) => (
+                <div
+                  key={file.id}
+                  className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group"
+                >
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <Checkbox
+                      checked={selectedIds.has(file.id)}
+                      onCheckedChange={() => toggleSelect(file.id)}
+                    />
+                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                      <File size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {file.filename}
+                      </p>
+                      <p className="text-[11px] text-gray-500">
+                        {formatFileSize(file.size)} • {formatDate(file.uploadedAt)}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {file.filename}
-                    </p>
-                    <p className="text-[11px] text-gray-500">
-                      {formatFileSize(file.size)} • {formatDate(file.uploadedAt)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Button
-                    onClick={() => downloadFile(file.id, file.filename)}
-                    variant="secondary"
-                    className="rounded-lg p-2 hover:bg-blue-50 hover:text-blue-600"
-                  >
-                    <Download size={18} />
-                  </Button>
-                  {authToken && (
+                  <div className="flex items-center space-x-1">
                     <Button
-                      onClick={() => deleteFile(file.id)}
+                      onClick={() => downloadFile(file.id, file.filename)}
                       variant="secondary"
-                      className="rounded-lg p-2 hover:bg-red-50 hover:text-red-600"
+                      className="rounded-lg p-2 hover:bg-blue-50 hover:text-blue-600"
                     >
-                      <Trash2 size={18} />
+                      <Download size={18} />
                     </Button>
-                  )}
+                    {authToken && (
+                      <Button
+                        onClick={() => deleteFile(file.id)}
+                        variant="secondary"
+                        className="rounded-lg p-2 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 size={18} />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
