@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { UploadCloud, File, Download, HardDrive } from 'lucide-react'
+import { UploadCloud, File, Download, HardDrive, Trash2 } from 'lucide-react'
 import { FileInfo } from '../types'
 import { Button } from './ui/Button'
 
@@ -117,6 +117,18 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
       })))
     } catch (error) {
       console.error('Failed to load files:', error)
+    }
+  }
+
+  const deleteFile = async (fileId: string) => {
+    if (!authToken) return
+    try {
+      const response = await fetch(`/api/files/${fileId}?token=${authToken}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Delete failed')
+      await loadFiles()
+    } catch (error) {
+      console.error('Delete error:', error)
+      alert('Delete error')
     }
   }
 
@@ -249,11 +261,11 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
             <p className="text-gray-500 text-sm">No files shared yet</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-3">
+          <div className="flex flex-col-reverse gap-3">
             {files.map((file) => (
               <div
                 key={file.id}
-                className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl hover:shadow-md transition-shadow group"
+                className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-xl group"
               >
                 <div className="flex items-center space-x-3 min-w-0">
                   <div className="p-2 bg-blue-50 text-blue-600 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -268,13 +280,24 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
                     </p>
                   </div>
                 </div>
-                <Button
-                  onClick={() => downloadFile(file.id, file.filename)}
-                  variant="secondary"
-                  className="rounded-lg p-2 hover:bg-blue-50 hover:text-blue-600"
-                >
-                  <Download size={18} />
-                </Button>
+                <div className="flex items-center space-x-1">
+                  <Button
+                    onClick={() => downloadFile(file.id, file.filename)}
+                    variant="secondary"
+                    className="rounded-lg p-2 hover:bg-blue-50 hover:text-blue-600"
+                  >
+                    <Download size={18} />
+                  </Button>
+                  {authToken && (
+                    <Button
+                      onClick={() => deleteFile(file.id)}
+                      variant="secondary"
+                      className="rounded-lg p-2 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 size={18} />
+                    </Button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

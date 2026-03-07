@@ -151,6 +151,28 @@ app.get('/api/files/:id', (c) => {
   return new Response(Bun.file(fileInfo.path).stream())
 })
 
+// Suppression d'un fichier
+app.delete('/api/files/:id', async (c) => {
+  const fileId = c.req.param('id')
+  const token = c.req.query('token')
+
+  if (token !== AUTH_TOKEN) {
+    return c.json({ error: 'Unauthorized' }, 403)
+  }
+
+  const fileInfo = fileStorage.get(fileId)
+  if (!fileInfo) {
+    return c.json({ error: 'File not found' }, 404)
+  }
+
+  try {
+    await Bun.file(fileInfo.path).exists() && require('fs').unlinkSync(fileInfo.path)
+  } catch (_) {}
+
+  fileStorage.delete(fileId)
+  return c.json({ success: true })
+})
+
 // Liste des fichiers disponibles
 app.get('/api/files', (c) => {
   const files = Array.from(fileStorage.entries()).map(([id, info]) => ({
