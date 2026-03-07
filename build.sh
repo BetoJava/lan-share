@@ -18,42 +18,26 @@ fi
 echo "📁 Creating dist directory..."
 mkdir -p dist
 
+# Install dependencies
+echo "📦 Installing dependencies..."
+bun install
+
 # Build frontend
 echo "🔨 Building frontend..."
-cd frontend
-
-if [ ! -d "node_modules" ]; then
-    echo "📦 Installing frontend dependencies..."
-    bun install
-fi
-
-echo "📦 Building frontend assets..."
-bun run build
-
-cd ..
+bun run build:frontend
 echo "✅ Frontend built successfully in dist/static/"
 echo ""
 
 # Build backend
 echo "🔨 Building backend..."
-cd backend
-
-if [ ! -d "node_modules" ]; then
-    echo "📦 Installing backend dependencies..."
-    bun install
-fi
-
-echo "📦 Creating standalone executable..."
-# Build standalone executable in the root dist directory
-bun build --compile src/index.ts --outfile ../dist/lan-share
+bun run build:backend
 
 # Make executable
-chmod +x ../dist/lan-share
+chmod +x dist/lan-share
 
-cd ..
 # Clean up
-rm -rf backend/node_modules frontend/node_modules
-rm backend/bun.lock frontend/bun.lock
+rm -rf node_modules frontend/node_modules backend/node_modules
+rm -f bun.lock
 
 echo "✅ Backend standalone executable created at dist/lan-share"
 echo ""

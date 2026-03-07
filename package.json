@@ -1,0 +1,11 @@
+{
+  "name": "lan-share",
+  "private": true,
+  "workspaces": ["frontend", "backend"],
+  "scripts": {
+    "dev:frontend": "bun run --filter lan-share-frontend dev",
+    "dev:backend": "bun run --filter lan-share-backend dev",
+    "build:frontend": "bun run --filter lan-share-frontend build",
+    "build:backend": "bun run --filter lan-share-backend build:standalone"
+  }
+}
