@@ -72,9 +72,6 @@ app.get('/api/host-ip', (c) => {
   })
 })
 
-// #region agent log
-  fetch('http://127.0.0.1:7244/ingest/848e389f-a149-4d02-97a5-84e3bca32d1c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend/src/index.ts:76',message:'Upload request received',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-// #endregion
 app.post('/api/files', async (c) => {
   try {
     const formData = await c.req.formData()
@@ -87,14 +84,7 @@ app.post('/api/files', async (c) => {
     // Support both single file (backward compatibility) and multiple files
     const filesToUpload = files.length > 0 ? files : (singleFile ? [singleFile] : [])
 
-    // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/848e389f-a149-4d02-97a5-84e3bca32d1c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend/src/index.ts:81',message:'Upload data extracted',data:{fileCount: filesToUpload.length, tokenReceived: authToken, expectedToken: AUTH_TOKEN},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
-
     if (filesToUpload.length === 0 || authToken !== AUTH_TOKEN) {
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/848e389f-a149-4d02-97a5-84e3bca32d1c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend/src/index.ts:84',message:'Invalid files or token',data:{fileCount: filesToUpload.length, tokenReceived: authToken, expectedToken: AUTH_TOKEN},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion
       return c.json({ error: 'Invalid files or token' }, 400)
     }
 
@@ -105,18 +95,10 @@ app.post('/api/files', async (c) => {
       const fileId = randomUUID()
       const filePath = join(tmpdir(), `lan-share-${fileId}-${file.name}`)
 
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/848e389f-a149-4d02-97a5-84e3bca32d1c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend/src/index.ts:91',message:'Saving file',data:{fileId, fileName: file.name, filePath},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
-
       // Save the file
       const arrayBuffer = await file.arrayBuffer()
       const buffer = Buffer.from(arrayBuffer)
       await Bun.write(filePath, buffer)
-
-      // #region agent log
-      fetch('http://127.0.0.1:7244/ingest/848e389f-a149-4d02-97a5-84e3bca32d1c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend/src/index.ts:98',message:'File saved successfully',data:{fileId, fileName: file.name},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-      // #endregion
 
       fileStorage.set(fileId, {
         filename: file.name,
@@ -150,9 +132,6 @@ app.post('/api/files', async (c) => {
 
     return c.json({ files: uploadedFiles })
   } catch (error: any) {
-    // #region agent log
-    fetch('http://127.0.0.1:7244/ingest/848e389f-a149-4d02-97a5-84e3bca32d1c',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend/src/index.ts:117',message:'Upload error',data:{error: error.message, stack: error.stack},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
     return c.json({ error: 'Internal Server Error' }, 500)
   }
 })
