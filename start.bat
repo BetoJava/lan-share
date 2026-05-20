@@ -22,12 +22,27 @@ if defined HOST_IP (
 
 echo Detecting network IP...
 
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /r "IPv4.*[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*"') do (
-    set "CANDIDATE=%%a"
-    set "CANDIDATE=!CANDIDATE: =!"
-    if not "!CANDIDATE!"=="127.0.0.1" (
-        set "IP=!CANDIDATE!"
-        goto :found_ip
+REM Parse ipconfig block by block, only keep IP from adapter with a default gateway
+set "CURRENT_IP="
+for /f "tokens=1,2,* delims=:" %%a in ('ipconfig') do (
+    set "LINE=%%a"
+    set "VALUE=%%b"
+    if defined VALUE (
+        set "VALUE=!VALUE: =!"
+        echo !LINE! | findstr /i "IPv4" >nul 2>nul && (
+            set "CURRENT_IP=!VALUE!"
+        )
+        echo !LINE! | findstr /i "Default Gateway" >nul 2>nul && (
+            if not "!VALUE!"=="" (
+                REM Skip IPv6 gateways
+                echo !VALUE! | findstr "." >nul 2>nul && (
+                    if defined CURRENT_IP (
+                        set "IP=!CURRENT_IP!"
+                        goto :found_ip
+                    )
+                )
+            )
+        )
     )
 )
 
