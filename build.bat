@@ -6,7 +6,7 @@ echo.
 
 where bun >nul 2>nul
 if errorlevel 1 (
-    echo Bun is not installed. Please install it first: https://bun.sh/
+    echo Bun is not installed. Please install it first: powershell -c "irm bun.sh/install.ps1 | iex", then add it to PATH with: $env:Path += ";C:\Users\jbjbt\.bun\bin"
     exit /b 1
 )
 

@@ -30,6 +30,8 @@ File sharing and real-time chat application for local WiFi networks.
   ```bash
   curl -fsSL https://bun.sh/install | bash
   ```
+  On windows: `powershell -c "irm bun.sh/install.ps1 | iex"`
+  Then: `$env:Path += ";C:\Users\jbjbt\.bun\bin"`
 
 ### Option 2: Docker
 - **Docker** and **Docker Compose**: [Install Docker](https://docs.docker.com/get-docker/)
@@ -38,7 +40,7 @@ File sharing and real-time chat application for local WiFi networks.
 
 # Usage
 
-1. **Start**: `./start.sh or ./start-docker.sh`
+1. **Start**: `./start.sh or ./start-docker.sh` (on windows: `.\start.bat or .\start-docker.bat`)
 2. **On your Computer**: Open `http://localhost:3009`
 3. **On your mobile**: Scan the QR code displayed on the Computer
 4. **Chat & Files**: Exchange text or files

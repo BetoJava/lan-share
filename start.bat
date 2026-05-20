@@ -10,7 +10,7 @@ if "%PORT_VAL%"=="" set "PORT_VAL=3009"
 
 if not exist "%EXECUTABLE_PATH%" (
     echo Standalone executable not found at %EXECUTABLE_PATH%
-    echo Please run build.bat first to create the executable in dist\.
+    echo Please run .\build.bat first to create the executable in dist\.
     exit /b 1
 )
 
