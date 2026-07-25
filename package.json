@@ -1,11 +1,18 @@
 {
   "name": "lan-share",
   "private": true,
-  "workspaces": ["frontend", "backend"],
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
   "scripts": {
     "dev:frontend": "bun run --filter lan-share-frontend dev",
     "dev:backend": "bun run --filter lan-share-backend dev",
     "build:frontend": "bun run --filter lan-share-frontend build",
-    "build:backend": "bun run --filter lan-share-backend build:standalone"
+    "build:backend": "bun run --filter lan-share-backend build:standalone",
+    "lint": "bun run --filter \"*\" lint",
+    "typecheck": "bun run --filter \"*\" typecheck",
+    "check": "bun run lint && bun run typecheck && bun run test",
+    "test": "bun run --filter lan-share-frontend test"
   }
 }

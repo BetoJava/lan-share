@@ -127,11 +127,13 @@ export const useWebSocket = () => {
     setIsAuthenticated(false)
   }, [])
 
+  // disconnect est stable (useCallback sans dépendance) : le lister ne
+  // provoque donc pas de réexécution
   useEffect(() => {
     return () => {
       disconnect()
     }
-  }, []) // disconnect is stable thanks to useCallback with []
+  }, [disconnect])
 
   return {
     isConnected,

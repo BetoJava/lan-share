@@ -11,8 +11,8 @@ import { TabType } from './types'
 function App() {
   const isSmallScreen = useIsSmallScreen()
   const [activeTab, setActiveTab] = useState<TabType>('chat')
-  const { isAuthenticated, urlToken, setIsAuthenticated } = useAuth()
-  const { isConnected, isAuthenticated: wsAuth, messages, sendMessage, disconnect, connect } = useWebSocket()
+  const { isAuthenticated, urlToken } = useAuth()
+  const { isConnected, isAuthenticated: wsAuth, messages, sendMessage, connect } = useWebSocket()
 
   // Connect to WebSocket when authenticated
   React.useEffect(() => {
@@ -20,12 +20,6 @@ function App() {
       connect(urlToken)
     }
   }, [isAuthenticated, urlToken, connect])
-
-  const handleLogout = () => {
-    disconnect()
-    setIsAuthenticated(false)
-    window.location.reload()
-  }
 
   const tabs = isSmallScreen ? [
     { id: 'chat', label: 'Chat', icon: MessageSquare },

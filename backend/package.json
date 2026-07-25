@@ -6,13 +6,19 @@
     "dev": "bun --hot src/index.ts",
     "build": "bun build src/index.ts --outdir dist",
     "build:standalone": "bun build --compile src/index.ts --outfile ../dist/lan-share",
-    "start": "bun dist/index.js"
+    "start": "bun dist/index.js",
+    "lint": "eslint . --ext ts --report-unused-disable-directives --max-warnings 0",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "hono": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "bun-types": "^1.0.0"
+    "bun-types": "latest",
+    "typescript": "^5.0.2",
+    "eslint": "^8.45.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
   }
 }

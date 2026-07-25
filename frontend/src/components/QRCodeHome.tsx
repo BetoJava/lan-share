@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import QRCode from 'qrcode'
 import { QrCode, Wifi, WifiOff } from 'lucide-react'
-import { StatusBadge } from './ui/StatusBadge'
 
 interface QRCodeHomeProps {
   isConnected: boolean
