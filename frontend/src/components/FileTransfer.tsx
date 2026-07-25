@@ -4,6 +4,10 @@ import { FileInfo } from '../types'
 import { Button } from './ui/Button'
 import { Checkbox } from './ui/checkbox'
 
+// Doit rester aligné avec MAX_FILE_SIZE côté backend (backend/src/index.ts)
+const MAX_FILE_SIZE_MB = 1000
+const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
+
 interface FileTransferProps {
   onFileUploaded?: () => void
   authToken?: string
@@ -16,7 +20,11 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
   const [uploadProgress, setUploadProgress] = useState(0)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploadingFiles, setUploadingFiles] = useState<{ file: File, progress: number }[]>([])
+  const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // dragenter/dragleave se déclenchent aussi sur les enfants de la zone :
+  // on compte les entrées/sorties pour ne pas éteindre le surlignage trop tôt
+  const dragDepth = useRef(0)
 
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -36,21 +44,52 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
     })
   }
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const fileList = event.target.files
+  // Point d'entrée commun au clic sur la zone et au glisser-déposer
+  const addFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return
 
     const filesArray = Array.from(fileList)
-    const maxSize = 1000 * 1024 * 1024
 
     // Check file sizes
-    const oversizedFiles = filesArray.filter(file => file.size > maxSize)
+    const oversizedFiles = filesArray.filter(file => file.size > MAX_FILE_SIZE)
     if (oversizedFiles.length > 0) {
-      alert(`The following files are too large (max 1000MB):\n${oversizedFiles.map(f => f.name).join('\n')}`)
+      alert(`The following files are too large (max ${MAX_FILE_SIZE_MB}MB):\n${oversizedFiles.map(f => f.name).join('\n')}`)
       return
     }
 
     setSelectedFiles(filesArray)
+  }
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    addFiles(event.target.files)
+  }
+
+  const handleDragEnter = (event: React.DragEvent) => {
+    event.preventDefault()
+    // Ignore les glissers de texte ou de liens : seuls les fichiers comptent
+    if (!event.dataTransfer.types.includes('Files')) return
+    dragDepth.current += 1
+    if (!isUploading) setIsDragging(true)
+  }
+
+  const handleDragOver = (event: React.DragEvent) => {
+    // Sans ça, le navigateur refuse le dépôt et ouvre le fichier à la place
+    event.preventDefault()
+    event.dataTransfer.dropEffect = isUploading ? 'none' : 'copy'
+  }
+
+  const handleDragLeave = (event: React.DragEvent) => {
+    event.preventDefault()
+    dragDepth.current = Math.max(0, dragDepth.current - 1)
+    if (dragDepth.current === 0) setIsDragging(false)
+  }
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault()
+    dragDepth.current = 0
+    setIsDragging(false)
+    if (isUploading) return
+    addFiles(event.dataTransfer.files)
   }
 
   const clearSelection = () => {
@@ -188,10 +227,24 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
 
   useEffect(() => {
     loadFiles()
-    
+
     // Poll every 2 seconds to refresh the file list
     const interval = setInterval(loadFiles, 2000)
     return () => clearInterval(interval)
+  }, [])
+
+  // Un fichier lâché en dehors de la zone de dépôt ferait naviguer le
+  // navigateur vers ce fichier et ferait perdre l'état de l'application
+  useEffect(() => {
+    const swallow = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes('Files')) event.preventDefault()
+    }
+    window.addEventListener('dragover', swallow)
+    window.addEventListener('drop', swallow)
+    return () => {
+      window.removeEventListener('dragover', swallow)
+      window.removeEventListener('drop', swallow)
+    }
   }, [])
 
   return (
@@ -214,18 +267,35 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
           />
           <label
             htmlFor="file-upload"
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
             className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-all ${
               isUploading
                 ? 'bg-gray-50 border-gray-200 cursor-not-allowed'
-                : 'bg-blue-50/30 border-blue-200 hover:border-blue-400 hover:bg-blue-50/50'
+                : isDragging
+                  ? 'bg-blue-100/70 border-blue-500 border-solid scale-[1.01]'
+                  : 'bg-blue-50/30 border-blue-200 hover:border-blue-400 hover:bg-blue-50/50'
             }`}
           >
-            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <UploadCloud className={`mb-3 ${isUploading ? 'text-gray-400 animate-pulse' : 'text-blue-500'}`} size={32} />
+            <div className="flex flex-col items-center justify-center pt-5 pb-6 pointer-events-none">
+              <UploadCloud
+                className={`mb-3 transition-transform ${
+                  isUploading ? 'text-gray-400 animate-pulse' : isDragging ? 'text-blue-600 -translate-y-1' : 'text-blue-500'
+                }`}
+                size={32}
+              />
               <p className="text-sm text-gray-700 font-medium">
-                {isUploading ? 'Upload in progress...' : selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Click to select files'}
+                {isUploading
+                  ? 'Upload in progress...'
+                  : isDragging
+                    ? 'Drop your files here'
+                    : selectedFiles.length > 0
+                      ? `${selectedFiles.length} file(s) selected`
+                      : 'Drag and drop your files, or click to select'}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Maximum 1000 MB per file</p>
+              <p className="text-xs text-gray-500 mt-1">Maximum {MAX_FILE_SIZE_MB} MB per file</p>
             </div>
           </label>
 

@@ -2,6 +2,14 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, MessageSquare, Copy, Check } from 'lucide-react'
 import { ChatMessage } from '../types'
 import { Button } from './ui/Button'
+import { useMediaQuery } from '../hooks/useMediaQuery'
+
+// Métriques partagées entre le textarea et son clone de mesure : toute
+// divergence ici décalerait la hauteur calculée
+const INPUT_BOX = 'px-4 py-2 text-base leading-6 border rounded-xl'
+// Plafond appliqué au clone comme au textarea : c'est le clone qui dimensionne
+// la ligne de grille, le borner sur le seul conteneur ne suffit pas
+const INPUT_MAX_H = 'max-h-[200px]'
 
 interface ChatProps {
   messages: ChatMessage[]
@@ -14,6 +22,9 @@ export const Chat = ({ messages, onSendMessage, isConnected }: ChatProps) => {
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Sur écran tactile, Entrée insère un retour à la ligne : on envoie au bouton
+  const hasKeyboard = useMediaQuery('(pointer: fine)')
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -22,41 +33,68 @@ export const Chat = ({ messages, onSendMessage, isConnected }: ChatProps) => {
     scrollToBottom()
   }, [messages])
 
+  const sendMessage = () => {
+    if (!inputMessage.trim() || !isConnected) return
+    // Seuls les blancs en bordure sont retirés : les retours à la ligne
+    // internes et les caractères markdown sont transmis tels quels
+    onSendMessage(inputMessage.trim())
+    setInputMessage('')
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (inputMessage.trim() && isConnected) {
-      onSendMessage(inputMessage.trim())
-      setInputMessage('')
+    sendMessage()
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey && hasKeyboard) {
+      e.preventDefault()
+      sendMessage()
     }
   }
 
-  const handleCopy = async (text: string, index: number) => {
+  // Copie via un textarea hors écran : préserve les retours à la ligne, donc
+  // le markdown ressort tel quel
+  const copyViaTextArea = (text: string) => {
+    const textArea = document.createElement("textarea")
+    textArea.value = text
+    textArea.style.position = "fixed"
+    textArea.style.left = "-9999px"
+    textArea.style.top = "0"
+    document.body.appendChild(textArea)
+    textArea.focus()
+    textArea.select()
+    let copied = false
     try {
-      // Tentative avec l'API moderne
-      if (navigator.clipboard && window.isSecureContext) {
+      copied = document.execCommand('copy')
+    } catch (err) {
+      console.error('Fallback copy failed', err)
+    }
+    document.body.removeChild(textArea)
+    return copied
+  }
+
+  const handleCopy = async (text: string, index: number) => {
+    let copied = false
+
+    // L'API moderne échoue aussi en contexte sécurisé quand la permission est
+    // refusée : on retombe sur execCommand au lieu d'abandonner en silence
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
         await navigator.clipboard.writeText(text)
-      } else {
-        // Fallback pour mobile/contextes non-sécurisés (HTTP)
-        const textArea = document.createElement("textarea")
-        textArea.value = text
-        textArea.style.position = "fixed"
-        textArea.style.left = "-9999px"
-        textArea.style.top = "0"
-        document.body.appendChild(textArea)
-        textArea.focus()
-        textArea.select()
-        try {
-          document.execCommand('copy')
-        } catch (err) {
-          console.error('Fallback copy failed', err)
-        }
-        document.body.removeChild(textArea)
+        copied = true
+      } catch (err) {
+        console.warn('Clipboard API refused, falling back', err)
       }
-      
+    }
+
+    if (!copied) copied = copyViaTextArea(text)
+
+    if (copied) {
       setCopiedId(index)
       setTimeout(() => setCopiedId(null), 2000)
-    } catch (err) {
-      console.error('Failed to copy text: ', err)
+    } else {
+      console.error('Failed to copy text')
     }
   }
 
@@ -114,23 +152,43 @@ export const Chat = ({ messages, onSendMessage, isConnected }: ChatProps) => {
       </div>
 
       <div className="border-t bg-gray-50/50 p-4">
-        <form onSubmit={handleSubmit} className="flex space-x-3">
-          <input
-            type="text"
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            placeholder={isConnected ? "Type your message..." : "Connection lost..."}
-            disabled={!isConnected}
-            className="flex-1 px-4 py-2 bg-white border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-all"
-          />
+        <form onSubmit={handleSubmit} className="flex items-end space-x-3">
+          {/* textarea et non input : un input single-line supprime les retours
+              à la ligne au collage, ce qui écrase toute mise en forme markdown.
+              La hauteur suit le contenu via un clone invisible placé dans la
+              même cellule de grille — c'est lui qui dicte la hauteur de la
+              ligne, le textarea s'y étire. Aucune mesure JS, donc rien qui
+              puisse se tromper si l'élément est calculé à largeur nulle. */}
+          <div className="flex-1 grid">
+            <div
+              aria-hidden="true"
+              className={`${INPUT_BOX} ${INPUT_MAX_H} [grid-area:1/1] invisible overflow-hidden whitespace-pre-wrap break-words border-transparent`}
+            >
+              {inputMessage + ' '}
+            </div>
+            <textarea
+              rows={1}
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isConnected ? "Type your message..." : "Connection lost..."}
+              disabled={!isConnected}
+              className={`${INPUT_BOX} ${INPUT_MAX_H} [grid-area:1/1] w-full bg-white border-gray-200 resize-none overflow-y-auto focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors`}
+            />
+          </div>
           <Button
             type="submit"
             disabled={!inputMessage.trim() || !isConnected}
-            className="rounded-xl px-4"
+            className="rounded-xl px-4 h-[42px]"
           >
             <Send size={18} />
           </Button>
         </form>
+        {hasKeyboard && (
+          <p className="text-[10px] text-gray-400 mt-1.5 px-1">
+            Enter to send &middot; Shift+Enter for a new line
+          </p>
+        )}
       </div>
     </div>
   )
