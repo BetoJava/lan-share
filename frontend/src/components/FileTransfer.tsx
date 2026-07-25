@@ -41,12 +41,12 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
     if (!fileList || fileList.length === 0) return
 
     const filesArray = Array.from(fileList)
-    const maxSize = 100 * 1024 * 1024
+    const maxSize = 1000 * 1024 * 1024
 
     // Check file sizes
     const oversizedFiles = filesArray.filter(file => file.size > maxSize)
     if (oversizedFiles.length > 0) {
-      alert(`The following files are too large (max 100MB):\n${oversizedFiles.map(f => f.name).join('\n')}`)
+      alert(`The following files are too large (max 1000MB):\n${oversizedFiles.map(f => f.name).join('\n')}`)
       return
     }
 
@@ -81,7 +81,8 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
       })
 
       if (!response.ok) {
-        throw new Error('Upload failed')
+        const body = await response.json().catch(() => null)
+        throw new Error(body?.error || `Upload failed (${response.status})`)
       }
 
       // Update progress for all files
@@ -98,7 +99,7 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
 
     } catch (error) {
       console.error('Upload error:', error)
-      alert('Upload error')
+      alert(error instanceof Error ? error.message : 'Upload error')
       setSelectedFiles([])
       setUploadingFiles([])
     } finally {
@@ -224,7 +225,7 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
               <p className="text-sm text-gray-700 font-medium">
                 {isUploading ? 'Upload in progress...' : selectedFiles.length > 0 ? `${selectedFiles.length} file(s) selected` : 'Click to select files'}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Maximum 100 MB per file</p>
+              <p className="text-xs text-gray-500 mt-1">Maximum 1000 MB per file</p>
             </div>
           </label>
 

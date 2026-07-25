@@ -10,6 +10,33 @@ const app = new Hono()
 const PORT = parseInt(process.env.PORT || '3009')
 const AUTH_TOKEN = randomUUID() // Token UUID4 généré au démarrage
 
+// Taille max par fichier, doit rester alignée avec le frontend (FileTransfer.tsx)
+const MAX_FILE_SIZE = 1000 * 1024 * 1024
+// Le frontend envoie tous les fichiers sélectionnés dans une seule requête,
+// donc la limite de body doit couvrir plusieurs fichiers à la fois.
+// Sans ça, Bun rejette la requête à 128 Mo (sa valeur par défaut).
+const MAX_REQUEST_BODY_SIZE = 4 * 1024 * 1024 * 1024
+
+// Nettoie un nom de fichier pour qu'il soit utilisable sur disque et en
+// Content-Disposition : pas de séparateur de chemin, pas de caractère de
+// contrôle, pas de caractère interdit sous Windows.
+const sanitizeFilename = (name: string): string => {
+  const base = (name.split(/[/\\]/).pop() || '')
+    .normalize('NFC')
+    .replace(/[\x00-\x1f\x7f]/g, '')
+    .replace(/[<>:"|?*]/g, '_')
+    .replace(/^\.+/, '')
+    .trim()
+
+  if (!base) return 'file'
+  if (base.length <= 200) return base
+
+  // Tronque en gardant l'extension
+  const dot = base.lastIndexOf('.')
+  const ext = dot > 0 ? base.slice(dot) : ''
+  return base.slice(0, 200 - ext.length) + ext
+}
+
 // Stockage des fichiers en mémoire
 const fileStorage = new Map<string, { filename: string, size: number, path: string, uploadedAt: Date }>()
 
@@ -88,20 +115,26 @@ app.post('/api/files', async (c) => {
       return c.json({ error: 'Invalid files or token' }, 400)
     }
 
+    const oversized = filesToUpload.filter(file => file.size > MAX_FILE_SIZE)
+    if (oversized.length > 0) {
+      return c.json({
+        error: `Files too large (max ${MAX_FILE_SIZE / 1024 / 1024}MB): ${oversized.map(f => f.name).join(', ')}`
+      }, 413)
+    }
+
     const uploadedFiles = []
 
     // Process each file
     for (const file of filesToUpload) {
       const fileId = randomUUID()
-      const filePath = join(tmpdir(), `lan-share-${fileId}-${file.name}`)
+      const filename = sanitizeFilename(file.name)
+      const filePath = join(tmpdir(), `lan-share-${fileId}-${filename}`)
 
-      // Save the file
-      const arrayBuffer = await file.arrayBuffer()
-      const buffer = Buffer.from(arrayBuffer)
-      await Bun.write(filePath, buffer)
+      // Save the file (Bun streams le Blob, pas de buffer complet en mémoire)
+      await Bun.write(filePath, file)
 
       fileStorage.set(fileId, {
-        filename: file.name,
+        filename,
         size: file.size,
         path: filePath,
         uploadedAt: new Date()
@@ -109,7 +142,7 @@ app.post('/api/files', async (c) => {
 
       uploadedFiles.push({
         fileId,
-        filename: file.name,
+        filename,
         size: file.size,
         uploadedAt: new Date().toISOString()
       })
@@ -118,7 +151,7 @@ app.post('/api/files', async (c) => {
       const notification = JSON.stringify({
         type: 'file_uploaded',
         fileId,
-        filename: file.name,
+        filename,
         size: file.size,
         uploadedAt: new Date().toISOString()
       })
@@ -145,8 +178,15 @@ app.get('/api/files/:id', (c) => {
     return c.json({ error: 'File not found' }, 404)
   }
 
+  // filename= en ASCII pour les vieux clients, filename*= en UTF-8 (RFC 5987)
+  // pour préserver accents et caractères non-latins
+  const asciiName = fileInfo.filename.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '')
+
   c.header('Content-Type', 'application/octet-stream')
-  c.header('Content-Disposition', `attachment; filename="${fileInfo.filename}"`)
+  c.header(
+    'Content-Disposition',
+    `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileInfo.filename)}`
+  )
 
   return new Response(Bun.file(fileInfo.path).stream())
 })
@@ -198,6 +238,7 @@ console.log(`Starting LAN Share server on port ${PORT}`)
 const server = Bun.serve<WSData>({
   port: PORT,
   hostname: '0.0.0.0',
+  maxRequestBodySize: MAX_REQUEST_BODY_SIZE,
 
   fetch(request, server) {
     const url = new URL(request.url)
