@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/bun'
 import { tmpdir } from 'os'
 import { join } from 'path'
+import { unlink } from 'fs/promises'
 import { randomUUID } from 'crypto'
 import { networkInterfaces } from 'os'
 
@@ -12,10 +13,10 @@ const AUTH_TOKEN = randomUUID() // Token UUID4 généré au démarrage
 
 // Taille max par fichier, doit rester alignée avec le frontend (FileTransfer.tsx)
 const MAX_FILE_SIZE = 1000 * 1024 * 1024
-// Le frontend envoie tous les fichiers sélectionnés dans une seule requête,
-// donc la limite de body doit couvrir plusieurs fichiers à la fois.
-// Sans ça, Bun rejette la requête à 128 Mo (sa valeur par défaut).
-const MAX_REQUEST_BODY_SIZE = 4 * 1024 * 1024 * 1024
+// Le frontend envoie un fichier par requête : la marge couvre l'encapsulation
+// multipart et le champ token. Sans cette option, Bun rejetterait toute
+// requête au-delà de 128 Mo (sa valeur par défaut).
+const MAX_REQUEST_BODY_SIZE = MAX_FILE_SIZE + 16 * 1024 * 1024
 
 // Nettoie un nom de fichier pour qu'il soit utilisable sur disque et en
 // Content-Disposition : pas de séparateur de chemin, pas de caractère de
@@ -23,6 +24,8 @@ const MAX_REQUEST_BODY_SIZE = 4 * 1024 * 1024 * 1024
 const sanitizeFilename = (name: string): string => {
   const base = (name.split(/[/\\]/).pop() || '')
     .normalize('NFC')
+    // Les caractères de contrôle sont précisément ce qu'on veut retirer
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x1f\x7f]/g, '')
     .replace(/[<>:"|?*]/g, '_')
     .replace(/^\.+/, '')
@@ -206,8 +209,12 @@ app.delete('/api/files/:id', async (c) => {
   }
 
   try {
-    await Bun.file(fileInfo.path).exists() && require('fs').unlinkSync(fileInfo.path)
-  } catch (_) {}
+    await unlink(fileInfo.path)
+  } catch (err) {
+    // Le fichier peut déjà avoir disparu du tmpdir : l'entrée en mémoire
+    // doit être retirée dans tous les cas
+    console.warn(`Could not delete ${fileInfo.path} from disk:`, err)
+  }
 
   fileStorage.delete(fileId)
   return c.json({ success: true })

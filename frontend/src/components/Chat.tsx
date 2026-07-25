@@ -3,6 +3,7 @@ import { Send, MessageSquare, Copy, Check } from 'lucide-react'
 import { ChatMessage } from '../types'
 import { Button } from './ui/Button'
 import { useMediaQuery } from '../hooks/useMediaQuery'
+import { markdownFromPaste } from '../lib/markdown-paste'
 
 // Métriques partagées entre le textarea et son clone de mesure : toute
 // divergence ici décalerait la hauteur calculée
@@ -21,6 +22,9 @@ export const Chat = ({ messages, onSendMessage, isConnected }: ChatProps) => {
   const [inputMessage, setInputMessage] = useState('')
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  // Position du curseur à restaurer après un collage réécrit
+  const caretAfterPaste = useRef<number | null>(null)
 
   // Sur écran tactile, Entrée insère un retour à la ligne : on envoie au bouton
   const hasKeyboard = useMediaQuery('(pointer: fine)')
@@ -32,6 +36,15 @@ export const Chat = ({ messages, onSendMessage, isConnected }: ChatProps) => {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Remplacer la valeur d'un textarea contrôlé replace le curseur à la fin :
+  // on le repositionne après le texte inséré
+  useEffect(() => {
+    const caret = caretAfterPaste.current
+    if (caret === null || !inputRef.current) return
+    inputRef.current.setSelectionRange(caret, caret)
+    caretAfterPaste.current = null
+  }, [inputMessage])
 
   const sendMessage = () => {
     if (!inputMessage.trim() || !isConnected) return
@@ -51,6 +64,21 @@ export const Chat = ({ messages, onSendMessage, isConnected }: ChatProps) => {
       e.preventDefault()
       sendMessage()
     }
+  }
+
+  // Coller depuis une page web fournit du HTML rendu, dont la version texte
+  // brut a perdu la mise en forme : on la reconstruit en markdown. Quand le
+  // presse-papiers contient déjà du markdown, le collage natif est conservé.
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const markdown = markdownFromPaste(e.clipboardData)
+    if (!markdown) return
+
+    e.preventDefault()
+    const { selectionStart, selectionEnd } = e.currentTarget
+    setInputMessage(current =>
+      current.slice(0, selectionStart) + markdown + current.slice(selectionEnd)
+    )
+    caretAfterPaste.current = selectionStart + markdown.length
   }
 
   // Copie via un textarea hors écran : préserve les retours à la ligne, donc
@@ -167,10 +195,12 @@ export const Chat = ({ messages, onSendMessage, isConnected }: ChatProps) => {
               {inputMessage + ' '}
             </div>
             <textarea
+              ref={inputRef}
               rows={1}
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder={isConnected ? "Type your message..." : "Connection lost..."}
               disabled={!isConnected}
               className={`${INPUT_BOX} ${INPUT_MAX_H} [grid-area:1/1] w-full bg-white border-gray-200 resize-none overflow-y-auto focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors`}

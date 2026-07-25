@@ -17,7 +17,6 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
   const [files, setFiles] = useState<FileInfo[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [isUploading, setIsUploading] = useState(false)
-  const [uploadProgress, setUploadProgress] = useState(0)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [uploadingFiles, setUploadingFiles] = useState<{ file: File, progress: number }[]>([])
   const [isDragging, setIsDragging] = useState(false)
@@ -99,61 +98,91 @@ export const FileTransfer = ({ onFileUploaded, authToken }: FileTransferProps) =
     }
   }
 
-  const handleUpload = async () => {
-    if (selectedFiles.length === 0) return
-
-    setIsUploading(true)
-    setUploadingFiles(selectedFiles.map(file => ({ file, progress: 0 })))
-
-    try {
+  // fetch n'expose pas la progression d'envoi : XHR est le seul moyen
+  // d'obtenir un pourcentage réel pendant le transfert
+  const uploadOneFile = (file: File, onProgress: (percent: number) => void) =>
+    new Promise<void>((resolve, reject) => {
       const formData = new FormData()
-      selectedFiles.forEach(file => {
-        formData.append('files', file)
-      })
+      formData.append('files', file)
       if (authToken) {
         formData.append('token', authToken)
       }
 
-      const response = await fetch('/api/files', {
-        method: 'POST',
-        body: formData
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', '/api/files')
+
+      xhr.upload.addEventListener('progress', (event) => {
+        if (event.lengthComputable) {
+          onProgress(Math.round((event.loaded / event.total) * 100))
+        }
       })
 
-      if (!response.ok) {
-        const body = await response.json().catch(() => null)
-        throw new Error(body?.error || `Upload failed (${response.status})`)
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          onProgress(100)
+          resolve()
+          return
+        }
+        let message = `Upload failed (${xhr.status})`
+        try {
+          message = JSON.parse(xhr.responseText).error || message
+        } catch {
+          // Réponse non JSON : le message générique fait l'affaire
+        }
+        reject(new Error(message))
+      })
+
+      xhr.addEventListener('error', () => reject(new Error('Network error')))
+      xhr.addEventListener('abort', () => reject(new Error('Upload cancelled')))
+
+      xhr.send(formData)
+    })
+
+  const handleUpload = async () => {
+    if (selectedFiles.length === 0) return
+
+    const batch = selectedFiles
+    setIsUploading(true)
+    setUploadingFiles(batch.map(file => ({ file, progress: 0 })))
+
+    // Une requête par fichier : la limite de taille s'applique ainsi par
+    // fichier et non au cumul du lot, et chacun a sa vraie progression.
+    // Un échec n'interrompt pas les suivants.
+    const failures: string[] = []
+    for (const [index, file] of batch.entries()) {
+      try {
+        await uploadOneFile(file, (progress) => {
+          setUploadingFiles(current =>
+            current.map((item, i) => (i === index ? { ...item, progress } : item))
+          )
+        })
+      } catch (error) {
+        console.error(`Upload failed for ${file.name}:`, error)
+        failures.push(`${file.name}: ${error instanceof Error ? error.message : 'unknown error'}`)
       }
+    }
 
-      // Update progress for all files
-      setUploadingFiles(selectedFiles.map(file => ({ file, progress: 100 })))
+    await loadFiles()
+    onFileUploaded?.()
 
-      await loadFiles()
-      onFileUploaded?.()
+    setSelectedFiles([])
+    setIsUploading(false)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+    setTimeout(() => setUploadingFiles([]), 1000)
 
-      // Clear selection after successful upload
-      setSelectedFiles([])
-      setTimeout(() => {
-        setUploadingFiles([])
-      }, 1000)
-
-    } catch (error) {
-      console.error('Upload error:', error)
-      alert(error instanceof Error ? error.message : 'Upload error')
-      setSelectedFiles([])
-      setUploadingFiles([])
-    } finally {
-      setIsUploading(false)
-      if (fileInputRef.current) {
-        fileInputRef.current.value = ''
-      }
+    if (failures.length > 0) {
+      alert(`${failures.length} of ${batch.length} file(s) failed:\n${failures.join('\n')}`)
     }
   }
 
   const loadFiles = async () => {
     try {
       const response = await fetch('/api/files')
-      const data = await response.json()
-      setFiles(data.files.map((f: any) => ({
+      const data: { files: (Omit<FileInfo, 'uploadedAt'> & { uploadedAt: string })[] } =
+        await response.json()
+      setFiles(data.files.map(f => ({
         ...f,
         uploadedAt: new Date(f.uploadedAt)
       })))
