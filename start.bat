@@ -50,7 +50,8 @@ echo Could not detect network IP automatically.
 echo.
 echo Alternative solutions:
 echo   - Run: ipconfig
-echo   - Or specify manually: set HOST_IP=your_ip ^&^& start.bat
+echo   - In CMD:        set HOST_IP=your_ip ^&^& start.bat
+echo   - In PowerShell: $env:HOST_IP="your_ip"; .\start.bat
 exit /b 1
 
 :found_ip
